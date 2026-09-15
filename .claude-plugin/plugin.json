@@ -1,0 +1,6 @@
+{
+  "name": "k8s-rca",
+  "displayName": "Kubernetes RCA Agent",
+  "version": "0.1.0",
+  "description": "Read-only Kubernetes root-cause-analysis agent: RBAC-scoped credential, read-only MCP tool surface, mutation/secret-blocking hooks, and a fixed diagnostic-order skill."
+}

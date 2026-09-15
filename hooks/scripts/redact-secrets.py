@@ -11,8 +11,13 @@ SECRET_PATTERNS = [
     (r"AKIA[0-9A-Z]{16}", "AWS access key"),
     (r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----", "private key block"),
     (
+        # Excludes values shaped like a function call / attribute access
+        # (os.environ.get(...), getenv(...), self.secret_key = gen()) so that
+        # source code *declaring how to read* a secret isn't itself flagged —
+        # only values that look like an actual literal are.
         r"(?i)\b[a-z0-9_]*(password|passwd|secret|api[_-]?key|token)[a-z0-9_]*"
-        r"\s*[:=]\s*['\"]?[^\s'\"]{4,}",
+        r"\s*[:=]\s*(?!['\"]?[a-z_][a-z0-9_.]*\s*\()"
+        r"['\"]?[^\s'\"]{4,}",
         "key=value secret-like assignment",
     ),
 ]

@@ -8,3 +8,10 @@
 2026-09-14T11:51:42.431530+00:00 tool=Bash matched=key=value secret-like assignment
 2026-09-14T11:51:42.458795+00:00 tool=Bash matched=AWS access key
 2026-09-14T11:51:42.487769+00:00 tool=Bash matched=private key block
+2026-09-15T07:02:49.398399+00:00 tool=mcp__kubernetes__pods_get matched=key=value secret-like assignment
+2026-09-15T07:02:51.299170+00:00 tool=mcp__kubernetes__resources_get matched=key=value secret-like assignment
+2026-09-15T07:44:53.443734+00:00 tool=Bash matched=key=value secret-like assignment
+2026-09-15T07:44:53.471287+00:00 tool=Bash matched=AWS access key
+2026-09-15T07:44:53.500684+00:00 tool=Bash matched=private key block
+2026-09-15T07:44:53.646336+00:00 tool=Bash matched=key=value secret-like assignment
+2026-09-15T07:44:53.673347+00:00 tool=Bash matched=key=value secret-like assignment

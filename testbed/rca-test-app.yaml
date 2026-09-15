@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rca-test-config
+  namespace: rca-agent-test
+data:
+  APP_GREETING: "hello from rca-test"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rca-test-secret
+  namespace: rca-agent-test
+stringData:
+  DB_PASSWORD: "TestOnly_NotARealSecret_42"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rca-test
+  namespace: rca-agent-test
+  labels:
+    app: rca-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rca-test
+  template:
+    metadata:
+      labels:
+        app: rca-test
+    spec:
+      containers:
+        - name: rca-test
+          image: python:3.11-slim
+          command: ["python3", "-u", "-c"]
+          args:
+            - |
+              import http.server, os, sys
+
+              greeting = os.environ.get("APP_GREETING")
+              db_password = os.environ.get("DB_PASSWORD")
+
+              if not greeting:
+                  print("FATAL: APP_GREETING is required but not set", file=sys.stderr)
+                  sys.exit(1)
+              if not db_password:
+                  print("FATAL: DB_PASSWORD is required but not set", file=sys.stderr)
+                  sys.exit(1)
+
+              class Handler(http.server.BaseHTTPRequestHandler):
+                  def do_GET(self):
+                      if self.path == "/healthz":
+                          self.send_response(200)
+                          self.end_headers()
+                          self.wfile.write(b"ok")
+                      else:
+                          self.send_response(200)
+                          self.end_headers()
+                          self.wfile.write(greeting.encode())
+
+                  def log_message(self, *args):
+                      pass
+
+              print(f"startup ok, greeting={greeting!r}")
+              http.server.HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+          envFrom:
+            - configMapRef:
+                name: rca-test-config
+            - secretRef:
+                name: rca-test-secret
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rca-test-svc
+  namespace: rca-agent-test
+  labels:
+    app: rca-test
+spec:
+  selector:
+    app: rca-test
+  ports:
+    - port: 8080
+      targetPort: 8080

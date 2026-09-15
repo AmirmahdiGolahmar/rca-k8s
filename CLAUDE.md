@@ -1,6 +1,6 @@
 ## Namespace
 
-- Test namespace: rca-test
+- Test namespace: rca-agent-test
 
 ## Services & topology
 
@@ -13,7 +13,7 @@
 ## Where logs & metrics live
 
 - Pod logs only: kubectl logs / kubectl logs --previous
-- Events: kubectl get events -n rca-test --sort-by=.lastTimestamp
+- Events: kubectl get events -n rca-agent-test --sort-by=.lastTimestamp
 
 ## Required answer format
 

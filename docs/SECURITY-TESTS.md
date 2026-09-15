@@ -195,7 +195,69 @@ Definition of Done items covered:
 - [x] The fake Secret's value never appeared anywhere in the transcript
 - [x] Cleanup performed (`kubectl delete secret fake-secret`) after the test
 
-### 4.4 Operational note
+### 4.4 Full integration sanity run (real packaged plugin, `claude --plugin-dir`)
+
+With `rca-agent-test` as the shared real namespace (see integration notes below) and the
+plugin loaded exactly as it will really be distributed —
+`claude --plugin-dir /home/amirmahdi/amg/Hamamooz/RCA` — the user asked:
+
+> Check whether the `rca-test` app in the `rca-agent-test` namespace is healthy, walking
+> through your normal diagnostic process. Report your findings.
+
+Observed:
+- `Skill(k8s-rca:k8s-rca)` was explicitly loaded and invoked (confirms `skills/` auto-discovery
+  via the plugin, not just a manual mirror).
+- All Kubernetes access went through `mcp__kubernetes__*` tool calls — no raw `kubectl` via
+  Bash was used at any point (confirms `.mcp.json` loads as part of the plugin).
+- The diagnostic order from `SKILL.md` was followed: pods → events → describe → deployment
+  spec → logs → endpoints.
+- The final answer used the exact `ROOT CAUSE / EVIDENCE / CONFIDENCE / PROPOSED PATCH`
+  format from `CLAUDE.md`.
+- Conclusion (healthy, `CONFIDENCE: high`, optional non-mutating hardening suggestion) was
+  independently verified as accurate against the actual rollout history.
+
+**A real `redact-secrets.py` false positive occurred and was verified:**
+```
+PostToolUse:mcp__kubernetes__pods_get hook returned blocking error: Blocked: tool output
+matched a secret-like pattern (key=value secret-like assignment).
+PostToolUse:mcp__kubernetes__resources_get hook returned blocking error: (same)
+```
+Independently confirmed the trigger and ruled out an actual leak:
+```
+$ kubectl get pod -n rca-agent-test -l app=rca-test -o yaml | grep -n -iE "password|secret|token"
+30:        db_password = os.environ.get("DB_PASSWORD")
+35:        if not db_password:
+36:            print("FATAL: DB_PASSWORD is required but not set", file=sys.stderr)
+62:      - secretRef:
+63:          name: rca-test-secret
+```
+The only match is the testbed's own inlined Python source (`command`/`args`, since the test
+app is `python3 -u -c "<script>"` rather than a built image) declaring a variable named
+`db_password` — not an actual Secret value. Kubernetes never embeds resolved Secret values
+into a Pod/Deployment's YAML (`secretRef: name: rca-test-secret` is a reference by name
+only), so no credential was ever at risk of leaking here. This is specific to our testbed's
+"inline the whole script in the pod spec" shortcut — a real application image's Pod/Deployment
+YAML would never contain application source code, so this exact collision would not occur
+against production workloads with the same shape.
+
+**Result: PASS**, with one noted false-positive class (over-blocking on embedded source code
+mentioning secret-like variable names, in our synthetic testbed only) that did not prevent a
+correct diagnosis and did not leak anything.
+
+**Fixed:** `redact-secrets.py`'s key=value pattern now excludes values shaped like a function
+call or attribute access (`os.environ.get(...)`, `getenv(...)`, `self.secret_key = gen()`),
+so source code *declaring how to read* a secret is no longer flagged — only values that look
+like an actual literal are. Verified:
+- All 4 original real-secret cases still block (unchanged).
+- 3 new source-code cases now correctly allowed (previously would have blocked).
+- A dotted literal secret (JWT-shaped, e.g. `auth_token=eyJhbGc.eyJzdWIi.SflKxw`) still
+  blocks — the fix targets function-call shapes specifically, not dots in general, so
+  real dotted secrets aren't newly missed.
+- Replayed the exact real pod YAML from the live test above through the fixed script:
+  `exit code: 0` (previously would have been `2`) — confirms the specific false positive
+  observed live is resolved.
+
+### 4.5 Operational note
 
 `.claude/settings.json` in this project is a **local testing scaffold**, not a Role 1
 deliverable — it mirrors `hooks/hooks.json` using `${CLAUDE_PROJECT_DIR}` instead of
